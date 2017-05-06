@@ -1,0 +1,214 @@
+//update sheet link, all other settings are on the sheet
+var SPREADSHEET_URL = "your-sheet-link";
+
+//sheet names. Changing is optional.
+var ADMIN_SHEET_NAME = "Admin";
+var ALERT_SHEET_NAME = "Alerts";
+
+var ss = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
+var adminSheet = ss.getSheetByName(ADMIN_SHEET_NAME);
+var alertSheet = ss.getSheetByName(ALERT_SHEET_NAME);
+
+function main(){
+   
+  //columns
+  var dateColumn = 2;
+  var thresholdMetricColumn = 4;
+  var thresholdOperatorColumn = 5;
+  var thresholdParamColumn = 6;
+  var alertMetricColumn = 8;
+  var alertOperatorColumn = 9;
+  var alertParamColumn = 10;
+  
+  //read values from sheet
+  var startDate = adminSheet.getRange(2, 2).getValue();
+  var endDate = adminSheet.getRange(3, 2).getValue();
+  var compareStartDate = adminSheet.getRange(5, 2).getValue();
+  var compareEndDate = adminSheet.getRange(6, 2).getValue();
+  var thresholdMetrics = [];
+  var thresholdOperators = [];
+  var thresholdParams = [];
+  var alertMetrics = [];
+  var alertParams = [];
+  var alertOperators = [];
+  var emails = [];
+  
+  var row = 2;
+  while(adminSheet.getRange(row, 12).getValue()){
+    emails.push(adminSheet.getRange(row, 12).getValue());row++;
+  }
+  
+  var row = 3;
+  while(adminSheet.getRange(row, thresholdMetricColumn).getValue()){
+    thresholdMetrics.push(adminSheet.getRange(row, thresholdMetricColumn).getValue());
+    thresholdOperators.push(adminSheet.getRange(row, thresholdOperatorColumn).getValue());
+    thresholdParams.push(adminSheet.getRange(row, thresholdParamColumn).getValue());
+    row++;  
+  }
+  row = 3;
+  while(adminSheet.getRange(row, alertMetricColumn).getValue()){
+    alertMetrics.push(adminSheet.getRange(row, alertMetricColumn).getValue());
+    alertParams.push(adminSheet.getRange(row, alertParamColumn).getValue());
+    alertOperators.push(adminSheet.getRange(row, alertOperatorColumn).getValue());
+    row++;}
+  var allMetrics = thresholdMetrics.concat(alertMetrics);
+  var whereString = "WHERE ";
+  
+  for(var thresh_i in thresholdMetrics){
+    whereString += thresholdMetrics[thresh_i];
+    whereString += " ";
+    whereString += thresholdOperators[thresh_i];
+    whereString += " ";
+    whereString += thresholdParams[thresh_i];
+    whereString += " ";
+    if(thresholdMetrics.length-1 != thresh_i){whereString += " AND ";}
+  }
+
+  var adGroups = {};
+  var compareAdGroups = {};
+  var compareRun = false;
+ 
+  for(var ii = 0;ii<2;ii++){
+    if(ii==1){compareRun = true;};
+    
+    if(compareRun){
+      whereString = "";
+      var duringString = " DURING " + compareStartDate + "," + compareEndDate;
+    }else{
+      var duringString = " DURING " + startDate + "," + endDate;  
+    }
+    var query = ("SELECT " + allMetrics.join(',') + ", AdGroupName,CampaignName,AdGroupId "+
+      " FROM   ADGROUP_PERFORMANCE_REPORT " +
+        whereString+
+          duringString);
+    var report = AdWordsApp.report(query);
+    var rows = report.rows();
+    while (rows.hasNext()) {
+      var row = rows.next();
+      //for each alert param metric selected, store it
+      for(var alertMetric_i in alertMetrics){
+        var alertMetric = alertMetrics[alertMetric_i];
+     
+        if(compareRun){     
+          if(alertMetric_i==0){  compareAdGroups[row["AdGroupId"]] = {}; };
+          if("undefined" === typeof compareAdGroups[row["AdGroupId"]].beforeMetrics){compareAdGroups[row["AdGroupId"]].beforeMetrics = {};};
+          compareAdGroups[row["AdGroupId"]].beforeMetrics[alertMetric] = parseFloat( row[alertMetric] );
+          compareAdGroups[row["AdGroupId"]]["AdGroupName"] = row["AdGroupName"];
+          compareAdGroups[row["AdGroupId"]]["CampaignName"] = row["CampaignName"];
+        }else{
+          if(alertMetric_i==0){  adGroups[row["AdGroupId"]] = {}; }
+          if("undefined" === typeof adGroups[row["AdGroupId"]].afterMetrics){adGroups[row["AdGroupId"]].afterMetrics = {};};
+          
+          adGroups[row["AdGroupId"]].afterMetrics[alertMetric] = parseFloat( row[alertMetric] );
+          adGroups[row["AdGroupId"]]["AdGroupName"] = row["AdGroupName"];
+          adGroups[row["AdGroupId"]]["CampaignName"] = row["CampaignName"];
+        }
+        
+        
+      }
+ 
+    }
+  }
+  //pull everything into adGroups object
+  for(var ag in adGroups){
+    adGroups[ag].beforeMetrics = {};
+    adGroups[ag].beforeMetrics = compareAdGroups[ag].beforeMetrics;
+    adGroups[ag].compareMetrics = {};
+    for(var met in adGroups[ag].afterMetrics){
+      adGroups[ag].compareMetrics[met] = returnDifference(adGroups[ag].afterMetrics[met], adGroups[ag].beforeMetrics[met], "percent");
+    }  
+  }
+  
+  //remove metrics that don't match the alert params
+  for(var ag in adGroups){
+    var trueCount = 0; //count each time the comparison is true
+    for(var met_i in alertMetrics){
+      var comp = compare(adGroups[ag].compareMetrics[alertMetrics[met_i]], alertOperators[met_i], alertParams[met_i]);
+      if(comp){trueCount++;};
+    }
+      if(trueCount!=alertMetrics.length){delete adGroups[ag];}
+  }
+
+  alertSheet.clearContents();
+ headersToSheet("Campaign Name", "AdGroup Name", alertMetrics);
+  var row = 2;
+  for(ag in adGroups){
+    metricsToSheet(row, adGroups[ag].CampaignName ,adGroups[ag].AdGroupName, adGroups[ag].beforeMetrics, adGroups[ag].afterMetrics, adGroups[ag].compareMetrics, alertMetrics);
+    row++;
+  }
+  alertSheet.sort(3, false);
+  for(var email_i in emails){ emailSheet(emails[email_i]);}
+  
+}//END MAIN
+
+function headersToSheet(campaignName, adGroupName, alertMetrics){
+  var headerValues = [[campaignName, adGroupName]];
+  alertSheet.getRange("A1:B1").setValues(headerValues);
+  headerValues = [];
+  for(var met_i in alertMetrics){
+
+    headerValues.push(alertMetrics[met_i] + " (before)");
+    headerValues.push(alertMetrics[met_i] + " (after)");
+    headerValues.push(alertMetrics[met_i] + " % change");
+  }
+  var metricHeaders = []; metricHeaders.push(headerValues);
+  alertSheet.getRange(1, 3, 1, alertMetrics.length*3).setValues(metricHeaders);
+  
+}
+function metricsToSheet(row,campaignName, adGroupName, before, after, compare, alertMetrics){
+  var headerValues = [[campaignName, adGroupName]];
+  alertSheet.getRange(row,1,1,2).setValues(headerValues);
+  headerValues = [];
+  for(var met in before){
+    headerValues.push(before[met], after[met], compare[met]);
+  }
+  var metricValues = []; metricValues.push(headerValues);
+  alertSheet.getRange(row, 3, 1, alertMetrics.length*3).setValues(metricValues);
+}
+
+function compare(metric, operator, compareMetric){
+  if(operator == ">"){
+    if(metric > compareMetric){return true}else{return false}
+  }else if(operator == "<"){
+    if(metric < compareMetric){return true}else{return false}
+  }
+}
+
+function returnDifference(number, compareNumber, type){
+  //needs to return 100% if that's the case
+  //needs to return infitiy if that's the case
+  if(number==0 && compareNumber==0){return 0;}
+  if(number=="undefined" || compareNumber=="undefined" || number=="NaN" || compareNumber=="NaN"){
+    return "undefined";
+  }else{
+    if(type=="number"){
+      return parseFloat(number-compareNumber);
+    }else if(type=="percent"){
+      return parseFloat((number-compareNumber)/compareNumber);
+    }else{
+      return "error, expected either 'percent' or 'number' as type";
+    }
+  }
+}
+
+function emailSheet(email) {
+ 
+  var subject = "AdWords Ad Group Alert";
+  var values = alertSheet.getDataRange().getValues();
+  var message = "You have Ad Group alerts. <br><br>";
+  message += "View dates, thresholds and parameters on the Google Spreadsheet: " + ss.getUrl();
+message += '<table style="background-color:white;border-collapse:collapse;" border = 1 cellpadding = 5><tr>';
+  for (var row=0;row<values.length;++row){
+    for(var col = 0;col<values[0].length;++col){
+      message += '<td>'+values[row][col]+'</td>';
+    }
+    message += '</tr><tr>';
+  }
+  message += '</tr></table>';
+  
+   MailApp.sendEmail({
+     to: email,
+     subject: subject,
+     htmlBody: message  
+   });
+}
