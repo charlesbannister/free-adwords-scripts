@@ -137,7 +137,10 @@ function main(){
     row++;
   }
   alertSheet.sort(3, false);
-  for(var email_i in emails){ emailSheet(emails[email_i]);}
+  function isEmpty(obj) {
+    return Object.keys(obj).length === 0;
+  }
+  if(!isEmpty(adGroups)){ for(var email_i in emails){ emailSheet(emails[email_i]);}}
   
 }//END MAIN
 
