@@ -20,11 +20,31 @@ function main(){
   var alertOperatorColumn = 9;
   var alertParamColumn = 10;
   
+  Date.prototype.yyyymmdd = function() {
+    var yyyy = this.getFullYear().toString();
+    var mm = (this.getMonth()+1).toString(); // getMonth() is zero-based
+    var dd  = this.getDate().toString();
+    return yyyy + (mm[1]?mm:"0"+mm[0]) + (dd[1]?dd:"0"+dd[0]); // padding
+  };
+  
   //read values from sheet
-  var startDate = adminSheet.getRange(2, 2).getValue();
-  var endDate = adminSheet.getRange(3, 2).getValue();
-  var compareStartDate = adminSheet.getRange(5, 2).getValue();
-  var compareEndDate = adminSheet.getRange(6, 2).getValue();
+  var currentPeriodStartsNDaysAgo = adminSheet.getRange(2, 2).getValue();
+  var currentPeriodEndsNDaysAgo = adminSheet.getRange(3, 2).getValue();
+  var previousPeriodStartsNDaysAgo = adminSheet.getRange(5, 2).getValue();
+  var previousPeriodEndsNDaysAgo = adminSheet.getRange(6, 2).getValue();
+  
+  //turn days ago into dates (YYYYMMMDD)
+  var date = new Date();
+  preStartDate = new Date(date.getTime()-(previousPeriodStartsNDaysAgo*24 * 60 * 60 * 1000));
+  preEndDate = new Date(date.getTime()-(previousPeriodEndsNDaysAgo*24 * 60 * 60 * 1000));
+  postStartDate = new Date(date.getTime()-(currentPeriodStartsNDaysAgo *24 * 60 * 60 * 1000));
+  postEndDate = new Date(date.getTime()-(currentPeriodEndsNDaysAgo *24 * 60 * 60 * 1000));
+  var compareStartDate = preStartDate.yyyymmdd();
+  var compareEndDate = preEndDate.yyyymmdd();
+  var startDate= postStartDate.yyyymmdd();
+  var endDate = postEndDate.yyyymmdd();
+  Logger.log(startDate + " - " + endDate + " - " + compareStartDate + " - " + compareEndDate);
+  
   var thresholdMetrics = [];
   var thresholdOperators = [];
   var thresholdParams = [];
