@@ -3,14 +3,13 @@
 *
 * Go to automatingadwords.com for installation instructions and advice
 *
-* Version: 1.1
+* Version: 1.2
 **/
   
 //your spreadsheet URL
 var SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/19Ui-DaYHkrNbM4X-s4R17vVcJXVv5NnTyHsNv35RC_s/edit#gid=0";
 //your sheet (tab) name
 var SHEET_NAME = "Builder";
- 
 
 
 //Cell Locations - Only to be changed if the sheet changes
@@ -54,11 +53,6 @@ function main() {
 
 function pauseExistingKeywords(){
   Logger.log("Pausing existing keywords...");
-  //get keywords
-  //store sheet keywords
-  //fetch keywords
-  //pause if in list
-  //but don't remove the keywords we've just created!
   Logger.log("keyword groups: " + keywordGroups);
   
   for(var kwGroup_i in keywordGroups){
@@ -167,7 +161,7 @@ function createKeywords(status){
     for(var neg_i in negSplit){
       adGroup.createNegativeKeyword(negSplit[neg_i])
     }
-    
+    currentKeywords = [];
     var currentKeywordsGet = adGroup.keywords().withCondition("Status = ENABLED").get();
     while(currentKeywordsGet.hasNext()){
      currentKeywords.push(currentKeywordsGet.next().getText()); 
@@ -182,6 +176,8 @@ function createKeywords(status){
     }
       keywordsToAdd.push(keyword.toLowerCase());
     }
+    
+    Logger.log("currentKeywords: " +currentKeywords);
     
     for(var keyword in keywords){
       if(addUrlsToKeywords == false){
