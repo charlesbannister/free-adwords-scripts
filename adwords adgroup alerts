@@ -12,13 +12,18 @@ var alertSheet = ss.getSheetByName(ALERT_SHEET_NAME);
 function main(){
    
   //columns
-  var dateColumn = 2;
-  var thresholdMetricColumn = 4;
-  var thresholdOperatorColumn = 5;
-  var thresholdParamColumn = 6;
-  var alertMetricColumn = 8;
-  var alertOperatorColumn = 9;
-  var alertParamColumn = 10;
+  var alertLevelColumn = 1;
+  var dateColumn = 4;
+  var attributeColumn = 6;
+  var attributeOperatorColumn = 7;
+  var attributeParamColumn = 8;  
+  var thresholdMetricColumn = 10;
+  var thresholdOperatorColumn = 11;
+  var thresholdParamColumn = 12;
+  var alertMetricColumn = 14;
+  var alertOperatorColumn = 15;
+  var alertParamColumn = 16;
+  var emailColumn = 18;
   
   Date.prototype.yyyymmdd = function() {
     var yyyy = this.getFullYear().toString();
@@ -28,10 +33,13 @@ function main(){
   };
   
   //read values from sheet
-  var currentPeriodStartsNDaysAgo = adminSheet.getRange(2, 2).getValue();
-  var currentPeriodEndsNDaysAgo = adminSheet.getRange(3, 2).getValue();
-  var previousPeriodStartsNDaysAgo = adminSheet.getRange(5, 2).getValue();
-  var previousPeriodEndsNDaysAgo = adminSheet.getRange(6, 2).getValue();
+  //var reportType = adminSheet.getRange(3, alertLevelColumn).getValue()
+  var reportType = "AdGroup";
+  
+  var currentPeriodStartsNDaysAgo = adminSheet.getRange(3, dateColumn).getValue();
+  var currentPeriodEndsNDaysAgo = adminSheet.getRange(4, dateColumn).getValue();
+  var previousPeriodStartsNDaysAgo = adminSheet.getRange(6, dateColumn).getValue();
+  var previousPeriodEndsNDaysAgo = adminSheet.getRange(7, dateColumn).getValue();
   
   //turn days ago into dates (YYYYMMMDD)
   var date = new Date();
@@ -39,38 +47,61 @@ function main(){
   preEndDate = new Date(date.getTime()-(previousPeriodEndsNDaysAgo*24 * 60 * 60 * 1000));
   postStartDate = new Date(date.getTime()-(currentPeriodStartsNDaysAgo *24 * 60 * 60 * 1000));
   postEndDate = new Date(date.getTime()-(currentPeriodEndsNDaysAgo *24 * 60 * 60 * 1000));
+  
   var compareStartDate = preStartDate.yyyymmdd();
   var compareEndDate = preEndDate.yyyymmdd();
   var startDate= postStartDate.yyyymmdd();
   var endDate = postEndDate.yyyymmdd();
+  
   Logger.log(startDate + " - " + endDate + " - " + compareStartDate + " - " + compareEndDate);
   
   var thresholdMetrics = [];
   var thresholdOperators = [];
   var thresholdParams = [];
+  var attributes = [];
+  var attributeOperators = [];
+  var attributeParams = [];
   var alertMetrics = [];
   var alertParams = [];
   var alertOperators = [];
   var emails = [];
   
-  var row = 2;
-  while(adminSheet.getRange(row, 12).getValue()){
-    emails.push(adminSheet.getRange(row, 12).getValue());row++;
+  var row = 3;
+  while(adminSheet.getRange(row, emailColumn).getValue()){
+    emails.push(adminSheet.getRange(row, emailColumn).getValue());row++;
   }
   
-  var row = 3;
+  var row = 4;
   while(adminSheet.getRange(row, thresholdMetricColumn).getValue()){
-    thresholdMetrics.push(adminSheet.getRange(row, thresholdMetricColumn).getValue());
+    var currentMetric = adminSheet.getRange(row, thresholdMetricColumn).getValue()
+    var currentMetricParam = adminSheet.getRange(row, thresholdParamColumn).getValue()
+    var moneyMetrics = ["TargetCpa","CpvBid","CpmBid","CpcBid","CostPerConversion","CostPerAllConversion","Cost","AverageCpm","AverageCpc","AverageCost","ActiveViewMeasurableCost","ActiveViewCpm"]
+    if(moneyMetrics.indexOf(currentMetric)>-1){
+      currentMetricParam = currentMetricParam*1000000;
+    }
+    thresholdMetrics.push(currentMetric);
     thresholdOperators.push(adminSheet.getRange(row, thresholdOperatorColumn).getValue());
-    thresholdParams.push(adminSheet.getRange(row, thresholdParamColumn).getValue());
+    thresholdParams.push(currentMetricParam);
     row++;  
   }
-  row = 3;
+  row = 4;
   while(adminSheet.getRange(row, alertMetricColumn).getValue()){
+
     alertMetrics.push(adminSheet.getRange(row, alertMetricColumn).getValue());
     alertParams.push(adminSheet.getRange(row, alertParamColumn).getValue());
     alertOperators.push(adminSheet.getRange(row, alertOperatorColumn).getValue());
     row++;}
+  //attribute filters
+   row = 4;
+  while(adminSheet.getRange(row, attributeColumn).getValue()){
+    attributes.push(adminSheet.getRange(row, attributeColumn).getValue());
+    attributeParams.push(adminSheet.getRange(row, attributeParamColumn).getValue());
+    attributeOperators.push(adminSheet.getRange(row, attributeOperatorColumn).getValue());
+    row++;}
+  var equalIndex =   attributeOperators.indexOf("EQUALS");
+  attributeOperators[equalIndex] = "=";
+  equalIndex =   attributeOperators.indexOf("NOT_EQUALS");
+  attributeOperators[equalIndex] = "!=";
   var allMetrics = thresholdMetrics.concat(alertMetrics);
   var whereString = "WHERE ";
   
@@ -83,10 +114,22 @@ function main(){
     whereString += " ";
     if(thresholdMetrics.length-1 != thresh_i){whereString += " AND ";}
   }
+  
+   for(var thresh_i in attributes){
+     whereString+= " AND ";
+    whereString += attributes[thresh_i];
+    whereString += " ";
+    whereString += attributeOperators[thresh_i];
+    whereString += " '";
+    whereString += attributeParams[thresh_i];
+    whereString += "' ";
+    if(attributes.length-1 != thresh_i){whereString += " AND ";}
+  }
 
   var adGroups = {};
   var compareAdGroups = {};
   var compareRun = false;
+ 
  
   for(var ii = 0;ii<2;ii++){
     if(ii==1){compareRun = true;};
@@ -97,10 +140,16 @@ function main(){
     }else{
       var duringString = " DURING " + startDate + "," + endDate;  
     }
-    var query = ("SELECT " + allMetrics.join(',') + ", AdGroupName,CampaignName,AdGroupId "+
-      " FROM   ADGROUP_PERFORMANCE_REPORT " +
+    var report;
+    var reportColumns = [];
+    if(reportType=="AdGroup"){report=" ADGROUP_PERFORMANCE_REPORT "; reportColumns = ["AdGroupName","CampaignName","AdGroupId"]}
+    else if(reportType=="Campaign"){report=" CAMPAIGN_PERFORMANCE_REPORT "; reportColumns = ["CampaignName","CampaignId"]}
+    else{Logger.log("Error, report type not recognised. Check column " + alertLevelColumn)}
+    var query = ("SELECT " + allMetrics.join(',') + ", "+reportColumns.join(",")+
+      " FROM  " + report+
         whereString+
           duringString);
+ Logger.log(query);
     var report = AdWordsApp.report(query);
     var rows = report.rows();
     while (rows.hasNext()) {
@@ -215,7 +264,7 @@ function returnDifference(number, compareNumber, type){
 }
 
 function emailSheet(email) {
- 
+
   var subject = "AdWords Ad Group Alert";
   var values = alertSheet.getDataRange().getValues();
   var message = "You have Ad Group alerts. <br><br>";
