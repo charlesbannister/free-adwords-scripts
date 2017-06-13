@@ -1,4 +1,4 @@
-var SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1d8HhtogC7y2jb0kVr6FymHZqVY42ClmPXPoDcXZz5j0/edit#gid=0";
+var SPREADSHEET_URL = "";
 var ADMIN_SHEET_NAME = "Admin";
 var ALERT_SHEET_NAME = "Alerts";
 var ss = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
