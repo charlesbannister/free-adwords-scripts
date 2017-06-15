@@ -265,7 +265,7 @@ function main(){
   function isEmpty(obj) {
     return Object.keys(obj).length === 0;
   }
-  //if(!isEmpty(adGroups)){ emailSheet(emails);}
+  if(!isEmpty(adGroups)){ emailSheet(emails);}
   
   
 }//END MAIN
