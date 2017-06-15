@@ -1,29 +1,32 @@
-//update sheet link, all other settings are on the sheet
-var SPREADSHEET_URL = "your-sheet-link";
-
-//sheet names. Changing is optional.
+var SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1YOlXFg8ylGPFCm8DgrRtLPzt92jylRJkLqS63vkTHlU/edit#gid=0";
 var ADMIN_SHEET_NAME = "Admin";
 var ALERT_SHEET_NAME = "Alerts";
-
 var ss = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
 var adminSheet = ss.getSheetByName(ADMIN_SHEET_NAME);
 var alertSheet = ss.getSheetByName(ALERT_SHEET_NAME);
 
 function main(){
    
-  //columns
+  //--COLUMNS--//
   var alertLevelColumn = 1;
   var dateColumn = 4;
   var attributeColumn = 6;
   var attributeOperatorColumn = 7;
   var attributeParamColumn = 8;  
-  var thresholdMetricColumn = 10;
-  var thresholdOperatorColumn = 11;
-  var thresholdParamColumn = 12;
-  var alertMetricColumn = 14;
-  var alertOperatorColumn = 15;
-  var alertParamColumn = 16;
-  var emailColumn = 18;
+  //metrics (previous)
+  var thresholdMetricColumn_prev = 10;
+  var thresholdOperatorColumn_prev = 11;
+  var thresholdParamColumn_prev = 12;
+  //metrics (current)
+  var thresholdMetricColumn_curr = 14;
+  var thresholdOperatorColumn_curr = 15;
+  var thresholdParamColumn_curr = 16;
+  //alert metrics
+  var alertMetricColumn = 18;
+  var alertOperatorColumn = 19;
+  var alertParamColumn = 20;
+  //email addresses
+  var emailColumn = 22;
   
   Date.prototype.yyyymmdd = function() {
     var yyyy = this.getFullYear().toString();
@@ -36,10 +39,10 @@ function main(){
   //var reportType = adminSheet.getRange(3, alertLevelColumn).getValue()
   var reportType = "AdGroup";
   
-  var currentPeriodStartsNDaysAgo = adminSheet.getRange(3, dateColumn).getValue();
-  var currentPeriodEndsNDaysAgo = adminSheet.getRange(4, dateColumn).getValue();
-  var previousPeriodStartsNDaysAgo = adminSheet.getRange(6, dateColumn).getValue();
-  var previousPeriodEndsNDaysAgo = adminSheet.getRange(7, dateColumn).getValue();
+  var currentPeriodStartsNDaysAgo = adminSheet.getRange(6, dateColumn).getValue();
+  var currentPeriodEndsNDaysAgo = adminSheet.getRange(7, dateColumn).getValue();
+  var previousPeriodStartsNDaysAgo = adminSheet.getRange(3, dateColumn).getValue();
+  var previousPeriodEndsNDaysAgo = adminSheet.getRange(4, dateColumn).getValue();
   
   //turn days ago into dates (YYYYMMMDD)
   var date = new Date();
@@ -54,94 +57,138 @@ function main(){
   var endDate = postEndDate.yyyymmdd();
   
   Logger.log(startDate + " - " + endDate + " - " + compareStartDate + " - " + compareEndDate);
+  //threshold (filter) metrics
+  var thresholdMetrics_prev = [];
+  var thresholdOperators_prev = [];
+  var thresholdParams_prev = [];
   
-  var thresholdMetrics = [];
-  var thresholdOperators = [];
-  var thresholdParams = [];
+  var thresholdMetrics_curr = [];
+  var thresholdOperators_curr = [];
+  var thresholdParams_curr = [];
+  
   var attributes = [];
   var attributeOperators = [];
   var attributeParams = [];
+  
   var alertMetrics = [];
   var alertParams = [];
   var alertOperators = [];
-  var emails = [];
   
+  //grab emails from sheet, but don't add duplicates
+  var emails = [];
   var row = 3;
   while(adminSheet.getRange(row, emailColumn).getValue()){
-    emails.push(adminSheet.getRange(row, emailColumn).getValue());row++;
+    emails.indexOf(adminSheet.getRange(row, emailColumn).getValue()) === -1 ? emails.push(adminSheet.getRange(row, emailColumn).getValue()) : Logger.log("Email already exists, removing the duplicate");row++;
   }
   
+  var moneyMetrics = ["TargetCpa","CpvBid","CpmBid","CpcBid","CostPerConversion","CostPerAllConversion","Cost","AverageCpm","AverageCpc","AverageCost","ActiveViewMeasurableCost","ActiveViewCpm"]
+  //threshold (filter) metrics - prev
   var row = 4;
-  while(adminSheet.getRange(row, thresholdMetricColumn).getValue()){
-    var currentMetric = adminSheet.getRange(row, thresholdMetricColumn).getValue()
-    var currentMetricParam = adminSheet.getRange(row, thresholdParamColumn).getValue()
-    var moneyMetrics = ["TargetCpa","CpvBid","CpmBid","CpcBid","CostPerConversion","CostPerAllConversion","Cost","AverageCpm","AverageCpc","AverageCost","ActiveViewMeasurableCost","ActiveViewCpm"]
+  while(adminSheet.getRange(row, thresholdMetricColumn_prev).getValue()){
+    var currentMetric = adminSheet.getRange(row, thresholdMetricColumn_prev).getValue()
+    var currentMetricParam = adminSheet.getRange(row, thresholdParamColumn_prev).getValue()
+    
     if(moneyMetrics.indexOf(currentMetric)>-1){
       currentMetricParam = currentMetricParam*1000000;
     }
-    thresholdMetrics.push(currentMetric);
-    thresholdOperators.push(adminSheet.getRange(row, thresholdOperatorColumn).getValue());
-    thresholdParams.push(currentMetricParam);
+    thresholdMetrics_prev.push(currentMetric);
+    thresholdOperators_prev.push(adminSheet.getRange(row, thresholdOperatorColumn_prev).getValue());
+    thresholdParams_prev.push(currentMetricParam);
     row++;  
   }
+  //threshold (filter) metrics - curr
+  var row = 4;
+  while(adminSheet.getRange(row, thresholdMetricColumn_curr).getValue()){
+    var currentMetric = adminSheet.getRange(row, thresholdMetricColumn_curr).getValue()
+    var currentMetricParam = adminSheet.getRange(row, thresholdParamColumn_curr).getValue()
+    
+    if(moneyMetrics.indexOf(currentMetric)>-1){
+      currentMetricParam = currentMetricParam*1000000;
+    }
+    thresholdMetrics_curr.push(currentMetric);
+    thresholdOperators_curr.push(adminSheet.getRange(row, thresholdOperatorColumn_curr).getValue());
+    thresholdParams_curr.push(currentMetricParam);
+    row++;  
+  }
+  //alert metrics
   row = 4;
   while(adminSheet.getRange(row, alertMetricColumn).getValue()){
 
     alertMetrics.push(adminSheet.getRange(row, alertMetricColumn).getValue());
     alertParams.push(adminSheet.getRange(row, alertParamColumn).getValue());
     alertOperators.push(adminSheet.getRange(row, alertOperatorColumn).getValue());
-    row++;}
+    row++;
+  }
   //attribute filters
    row = 4;
   while(adminSheet.getRange(row, attributeColumn).getValue()){
     attributes.push(adminSheet.getRange(row, attributeColumn).getValue());
     attributeParams.push(adminSheet.getRange(row, attributeParamColumn).getValue());
     attributeOperators.push(adminSheet.getRange(row, attributeOperatorColumn).getValue());
-    row++;}
+    row++;
+  }
+  
   var equalIndex =   attributeOperators.indexOf("EQUALS");
   attributeOperators[equalIndex] = "=";
   equalIndex =   attributeOperators.indexOf("NOT_EQUALS");
   attributeOperators[equalIndex] = "!=";
-  var allMetrics = thresholdMetrics.concat(alertMetrics);
-  var whereString = "WHERE ";
+  var allMetrics = thresholdMetrics_prev.concat(alertMetrics);
   
-  for(var thresh_i in thresholdMetrics){
-    whereString += thresholdMetrics[thresh_i];
-    whereString += " ";
-    whereString += thresholdOperators[thresh_i];
-    whereString += " ";
-    whereString += thresholdParams[thresh_i];
-    whereString += " ";
-    if(thresholdMetrics.length-1 != thresh_i){whereString += " AND ";}
-  }
+  var hasAttributes = attributes.length>0 ? true : false
+  var hasthresholdMetrics_prev = thresholdMetrics_prev.length>0 ? true : false
+  var hasthresholdMetrics_curr = thresholdMetrics_curr.length>0 ? true : false
   
-   for(var thresh_i in attributes){
-     whereString+= " AND ";
-    whereString += attributes[thresh_i];
-    whereString += " ";
-    whereString += attributeOperators[thresh_i];
-    whereString += " '";
-    whereString += attributeParams[thresh_i];
-    whereString += "' ";
-    if(attributes.length-1 != thresh_i){whereString += " AND ";}
-  }
-
   var adGroups = {};
   var compareAdGroups = {};
   var compareRun = false;
- 
- 
   for(var ii = 0;ii<2;ii++){
     if(ii==1){compareRun = true;};
+     
+    //build up where string
+    var whereString = "WHERE ";
+    if(hasAttributes){
+      for(var i in attributes){
+        whereString += attributes[i] + " "
+        whereString += attributeOperators[i] + " '"
+        whereString += attributeParams[i] + " '"
+        whereString += (attributes.length-1).toFixed(0) > i ? " AND " : " "
+      }
+    }
+    
+     if(hasthresholdMetrics_curr && !compareRun){
+       if(hasAttributes){whereString+=" AND "}
+      for(var i in thresholdMetrics_curr){
+        whereString += thresholdMetrics_curr[i] + " "
+        whereString += thresholdOperators_curr[i] + " "
+        whereString += thresholdParams_curr[i] + " "
+        whereString += (thresholdMetrics_curr.length-1).toFixed(0) > i ? " AND " : " "
+      }
+    }
+    
+    if(hasthresholdMetrics_prev && compareRun){
+       if(hasAttributes){whereString+=" AND "}
+      for(var i in thresholdMetrics_curr){
+        whereString += thresholdMetrics_prev[i] + " "
+        whereString += thresholdOperators_prev[i] + " "
+        whereString += thresholdParams_prev[i] + " "
+        whereString += (thresholdMetrics_prev.length-1).toFixed(0) > i ? " AND " : " "
+      }
+    }
+    
+    
+    whereString = whereString=="WHERE " ? "" : whereString
+    
+    Logger.log("whereString: " + whereString);
     
     if(compareRun){
-      whereString = "";
-      var duringString = " DURING " + compareStartDate + "," + compareEndDate;
+       var duringString = " DURING " + compareStartDate + "," + compareEndDate;
     }else{
       var duringString = " DURING " + startDate + "," + endDate;  
     }
+    
     var report;
     var reportColumns = [];
+    
     if(reportType=="AdGroup"){report=" ADGROUP_PERFORMANCE_REPORT "; reportColumns = ["AdGroupName","CampaignName","AdGroupId"]}
     else if(reportType=="Campaign"){report=" CAMPAIGN_PERFORMANCE_REPORT "; reportColumns = ["CampaignName","CampaignId"]}
     else{Logger.log("Error, report type not recognised. Check column " + alertLevelColumn)}
@@ -149,11 +196,13 @@ function main(){
       " FROM  " + report+
         whereString+
           duringString);
- Logger.log(query);
+    
+    Logger.log("Compare run? + query: " + compareRun + " - " + query);
     var report = AdWordsApp.report(query);
     var rows = report.rows();
     while (rows.hasNext()) {
       var row = rows.next();
+      
       //for each alert param metric selected, store it
       for(var alertMetric_i in alertMetrics){
         var alertMetric = alertMetrics[alertMetric_i];
@@ -161,39 +210,46 @@ function main(){
         if(compareRun){     
           if(alertMetric_i==0){  compareAdGroups[row["AdGroupId"]] = {}; };
           if("undefined" === typeof compareAdGroups[row["AdGroupId"]].beforeMetrics){compareAdGroups[row["AdGroupId"]].beforeMetrics = {};};
-          compareAdGroups[row["AdGroupId"]].beforeMetrics[alertMetric] = parseFloat( row[alertMetric] );
+          compareAdGroups[row["AdGroupId"]].beforeMetrics[alertMetric] = row[alertMetric].replace(",","");
           compareAdGroups[row["AdGroupId"]]["AdGroupName"] = row["AdGroupName"];
           compareAdGroups[row["AdGroupId"]]["CampaignName"] = row["CampaignName"];
         }else{
           if(alertMetric_i==0){  adGroups[row["AdGroupId"]] = {}; }
           if("undefined" === typeof adGroups[row["AdGroupId"]].afterMetrics){adGroups[row["AdGroupId"]].afterMetrics = {};};
-          
-          adGroups[row["AdGroupId"]].afterMetrics[alertMetric] = parseFloat( row[alertMetric] );
+          adGroups[row["AdGroupId"]].afterMetrics[alertMetric] = row[alertMetric].replace(",","");
           adGroups[row["AdGroupId"]]["AdGroupName"] = row["AdGroupName"];
           adGroups[row["AdGroupId"]]["CampaignName"] = row["CampaignName"];
         }
-        
         
       }
  
     }
   }
+
   //pull everything into adGroups object
   for(var ag in adGroups){
     adGroups[ag].beforeMetrics = {};
-    adGroups[ag].beforeMetrics = compareAdGroups[ag].beforeMetrics;
-    adGroups[ag].compareMetrics = {};
-    for(var met in adGroups[ag].afterMetrics){
-      adGroups[ag].compareMetrics[met] = returnDifference(adGroups[ag].afterMetrics[met], adGroups[ag].beforeMetrics[met], "percent");
-    }  
+    if(typeof compareAdGroups[ag] != "undefined"){
+      adGroups[ag].beforeMetrics = compareAdGroups[ag].beforeMetrics;
+      adGroups[ag].compareMetrics = {};
+      for(var met in adGroups[ag].afterMetrics){
+        adGroups[ag].compareMetrics[met] = returnDifference(adGroups[ag].afterMetrics[met], adGroups[ag].beforeMetrics[met], "percent");
+      }  
+    }
   }
   
   //remove metrics that don't match the alert params
   for(var ag in adGroups){
     var trueCount = 0; //count each time the comparison is true
     for(var met_i in alertMetrics){
-      var comp = compare(adGroups[ag].compareMetrics[alertMetrics[met_i]], alertOperators[met_i], alertParams[met_i]);
-      if(comp){trueCount++;};
+       if(typeof adGroups[ag].compareMetrics != "undefined"){
+         //log if batten lights (debug)
+         if(adGroups[ag].AdGroupName == "LED Batten Lights - Size"){
+             Logger.log("adGroups[ag]: " + JSON.stringify(adGroups[ag]));
+         }
+         var comp = compare(adGroups[ag].compareMetrics[alertMetrics[met_i]], alertOperators[met_i], alertParams[met_i]);
+         if(comp){trueCount++;};
+       }
     }
       if(trueCount!=alertMetrics.length){delete adGroups[ag];}
   }
@@ -209,7 +265,8 @@ function main(){
   function isEmpty(obj) {
     return Object.keys(obj).length === 0;
   }
-  if(!isEmpty(adGroups)){ for(var email_i in emails){ emailSheet(emails[email_i]);}}
+  //if(!isEmpty(adGroups)){ emailSheet(emails);}
+  
   
 }//END MAIN
 
@@ -218,15 +275,14 @@ function headersToSheet(campaignName, adGroupName, alertMetrics){
   alertSheet.getRange("A1:B1").setValues(headerValues);
   headerValues = [];
   for(var met_i in alertMetrics){
-
     headerValues.push(alertMetrics[met_i] + " (before)");
     headerValues.push(alertMetrics[met_i] + " (after)");
     headerValues.push(alertMetrics[met_i] + " % change");
   }
   var metricHeaders = []; metricHeaders.push(headerValues);
   alertSheet.getRange(1, 3, 1, alertMetrics.length*3).setValues(metricHeaders);
-  
 }
+
 function metricsToSheet(row,campaignName, adGroupName, before, after, compare, alertMetrics){
   var headerValues = [[campaignName, adGroupName]];
   alertSheet.getRange(row,1,1,2).setValues(headerValues);
@@ -263,24 +319,136 @@ function returnDifference(number, compareNumber, type){
   }
 }
 
-function emailSheet(email) {
-
+function emailSheet(emails) {
+  
   var subject = "AdWords Ad Group Alert";
   var values = alertSheet.getDataRange().getValues();
+
   var message = "You have Ad Group alerts. <br><br>";
-  message += "View dates, thresholds and parameters on the Google Spreadsheet: " + ss.getUrl();
+  message += "View dates, thresholds and parameters on the Google Spreadsheet: " + ss.getUrl() + "<br>";
 message += '<table style="background-color:white;border-collapse:collapse;" border = 1 cellpadding = 5><tr>';
   for (var row=0;row<values.length;++row){
     for(var col = 0;col<values[0].length;++col){
-      message += '<td>'+values[row][col]+'</td>';
+      
+      message += isNaN(values[row][col]) ? '<td>'+values[row][col]+'</td>': '<td>'+Math.round10(values[row][col], -2)+'</td>';
+ 
     }
     message += '</tr><tr>';
   }
   message += '</tr></table>';
   
+    for(var email_i in emails){
    MailApp.sendEmail({
-     to: email,
+     to: emails[email_i],
      subject: subject,
      htmlBody: message  
    });
+  }
+  
+  
+}
+
+
+  function decimalAdjust(type, value, exp) {
+    // If the exp is undefined or zero...
+    if (typeof exp === 'undefined' || +exp === 0) {
+      return Math[type](value);
+    }
+    value = +value;
+    exp = +exp;
+    // If the value is not a number or the exp is not an integer...
+    if (isNaN(value) || !(typeof exp === 'number' && exp % 1 === 0)) {
+      return NaN;
+    }
+    // If the value is negative...
+    if (value < 0) {
+      return -decimalAdjust(type, -value, exp);
+    }
+    // Shift
+    value = value.toString().split('e');
+    value = Math[type](+(value[0] + 'e' + (value[1] ? (+value[1] - exp) : -exp)));
+    // Shift back
+    value = value.toString().split('e');
+    return +(value[0] + 'e' + (value[1] ? (+value[1] + exp) : exp));
+  }
+  
+  if (!Math.round10) {
+    Math.round10 = function(value, exp) {
+      return decimalAdjust('round', value, exp);
+    };
+  }
+
+
+function getHtmlTable(range){
+  var ss = range.getSheet().getParent();
+  var sheet = range.getSheet();
+  startRow = range.getRow();
+  startCol = range.getColumn();
+  lastRow = range.getLastRow();
+  lastCol = range.getLastColumn();
+
+  // Read table contents
+  var data = range.getValues();
+
+  // Get css style attributes from range
+  var fontColors = range.getFontColors();
+  var backgrounds = range.getBackgrounds();
+  var fontFamilies = range.getFontFamilies();
+  var fontSizes = range.getFontSizes();
+  var fontLines = range.getFontLines();
+  var fontWeights = range.getFontWeights();
+  var horizontalAlignments = range.getHorizontalAlignments();
+  var verticalAlignments = range.getVerticalAlignments();
+
+  // Get column widths in pixels
+  var colWidths = [];
+  for (var col=startCol; col<=lastCol; col++) { 
+    colWidths.push(sheet.getColumnWidth(col));
+  }
+  // Get Row heights in pixels
+  var rowHeights = [];
+  for (var row=startRow; row<=lastRow; row++) { 
+    rowHeights.push(sheet.getRowHeight(row));
+  }
+
+  // Future consideration...
+  var numberFormats = range.getNumberFormats();
+
+  // Build HTML Table, with inline styling for each cell
+  var tableFormat = 'style="border:1px solid black;border-collapse:collapse;text-align:center" border = 1 cellpadding = 5';
+  var html = ['<table '+tableFormat+'>'];
+  // Column widths appear outside of table rows
+  for (col=0;col<colWidths.length;col++) {
+    html.push('<col width="'+colWidths[col]+'">')
+  }
+  // Populate rows
+  for (row=0;row<data.length;row++) {
+    html.push('<tr height="'+rowHeights[row]+'">');
+    for (col=0;col<data[row].length;col++) {
+      // Get formatted data
+      var cellText = data[row][col];
+      if (cellText instanceof Date) {
+        cellText = Utilities.formatDate(
+                     cellText,
+                     ss.getSpreadsheetTimeZone(),
+                     'MMM/d EEE');
+      }
+      var style = 'style="'
+                + 'color: ' + fontColors[row][col]+'; '
+                + 'font-family: ' + fontFamilies[row][col]+'; '
+                + 'font-size: ' + fontSizes[row][col]+'; '
+                + 'font-weight: ' + fontWeights[row][col]+'; '
+                + 'background-color: ' + backgrounds[row][col]+'; '
+                + 'text-align: ' + horizontalAlignments[row][col]+'; '
+                + 'vertical-align: ' + verticalAlignments[row][col]+'; '
+                +'"';
+      html.push('<td ' + style + '>'
+                +cellText
+                +'</td>');
+    }
+    html.push('</tr>');
+  }
+  html.push('</table>');
+
+  return html.join('');
 }
