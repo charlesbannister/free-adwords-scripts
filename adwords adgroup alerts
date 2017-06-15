@@ -1,4 +1,4 @@
-var SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1YOlXFg8ylGPFCm8DgrRtLPzt92jylRJkLqS63vkTHlU/edit#gid=0";
+var SPREADSHEET_URL = "";
 var ADMIN_SHEET_NAME = "Admin";
 var ALERT_SHEET_NAME = "Alerts";
 var ss = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
@@ -165,9 +165,10 @@ function main(){
       }
     }
     
+    Logger.log("hasthresholdMetrics_prev: " + hasthresholdMetrics_prev)
     if(hasthresholdMetrics_prev && compareRun){
        if(hasAttributes){whereString+=" AND "}
-      for(var i in thresholdMetrics_curr){
+      for(var i in thresholdMetrics_prev){
         whereString += thresholdMetrics_prev[i] + " "
         whereString += thresholdOperators_prev[i] + " "
         whereString += thresholdParams_prev[i] + " "
