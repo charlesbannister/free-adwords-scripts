@@ -91,6 +91,7 @@ function main(){
     if(moneyMetrics.indexOf(currentMetric)>-1){
       currentMetricParam = currentMetricParam*1000000;
     }
+
     thresholdMetrics_prev.push(currentMetric);
     thresholdOperators_prev.push(adminSheet.getRange(row, thresholdOperatorColumn_prev).getValue());
     thresholdParams_prev.push(currentMetricParam);
@@ -105,6 +106,7 @@ function main(){
     if(moneyMetrics.indexOf(currentMetric)>-1){
       currentMetricParam = currentMetricParam*1000000;
     }
+
     thresholdMetrics_curr.push(currentMetric);
     thresholdOperators_curr.push(adminSheet.getRange(row, thresholdOperatorColumn_curr).getValue());
     thresholdParams_curr.push(currentMetricParam);
@@ -150,7 +152,7 @@ function main(){
       for(var i in attributes){
         whereString += attributes[i] + " "
         whereString += attributeOperators[i] + " '"
-        whereString += attributeParams[i] + " '"
+        whereString += attributeParams[i] + "' "
         whereString += (attributes.length-1).toFixed(0) > i ? " AND " : " "
       }
     }
@@ -165,7 +167,7 @@ function main(){
       }
     }
     
-    Logger.log("hasthresholdMetrics_prev: " + hasthresholdMetrics_prev)
+
     if(hasthresholdMetrics_prev && compareRun){
        if(hasAttributes){whereString+=" AND "}
       for(var i in thresholdMetrics_prev){
@@ -208,6 +210,9 @@ function main(){
       for(var alertMetric_i in alertMetrics){
         var alertMetric = alertMetrics[alertMetric_i];
      
+      row[alertMetric] = typeof row[alertMetric].replace === "function" ?  row[alertMetric].replace("%","") : toString(row[alertMetric]).replace("%","");
+
+      
         if(compareRun){     
           if(alertMetric_i==0){  compareAdGroups[row["AdGroupId"]] = {}; };
           if("undefined" === typeof compareAdGroups[row["AdGroupId"]].beforeMetrics){compareAdGroups[row["AdGroupId"]].beforeMetrics = {};};
@@ -223,8 +228,12 @@ function main(){
         }
         
       }
+      
+      
  
     }
+    
+    Logger.log("compareAdGroups: " + JSON.stringify(compareAdGroups))
   }
 
   //pull everything into adGroups object
@@ -239,19 +248,17 @@ function main(){
     }
   }
   
+
   //remove metrics that don't match the alert params
   for(var ag in adGroups){
     var trueCount = 0; //count each time the comparison is true
     for(var met_i in alertMetrics){
        if(typeof adGroups[ag].compareMetrics != "undefined"){
-         //log if batten lights (debug)
-         if(adGroups[ag].AdGroupName == "LED Batten Lights - Size"){
-             Logger.log("adGroups[ag]: " + JSON.stringify(adGroups[ag]));
-         }
          var comp = compare(adGroups[ag].compareMetrics[alertMetrics[met_i]], alertOperators[met_i], alertParams[met_i]);
-         if(comp){trueCount++;};
+         if(comp || adGroups[ag].compareMetrics[alertMetrics[met_i]] == "inf"){trueCount++;};
        }
     }
+   
       if(trueCount!=alertMetrics.length){delete adGroups[ag];}
   }
 
@@ -313,7 +320,7 @@ function returnDifference(number, compareNumber, type){
     if(type=="number"){
       return parseFloat(number-compareNumber);
     }else if(type=="percent"){
-      return parseFloat((number-compareNumber)/compareNumber);
+      return (parseFloat(number) >0 && parseFloat(compareNumber) == 0) ? "inf" : parseFloat((number-compareNumber)/compareNumber);
     }else{
       return "error, expected either 'percent' or 'number' as type";
     }
