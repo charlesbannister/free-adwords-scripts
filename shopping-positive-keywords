@@ -1,0 +1,137 @@
+var ssLink = "your-sheet-url"
+var ss = SpreadsheetApp.openByUrl(ssLink);
+var queryClickMinimum = 1; //before being added as a negative, queries must have had a minimum of [queryClickMinimum] clicks i.e. where clicks > [queryClickMinimum]
+
+function main() {
+
+  var sheets = ss.getSheets();
+  var times = new Object();
+  var timesArray = [];
+  //get timestamps
+  var i = 0;
+  for(var sheetNo in sheets){
+    
+    var sheet = sheets[sheetNo];
+    var timestamp = sheet.getRange(1, 3).getValue();
+    
+    if(timestamp){
+      times[timestamp] = sheet.getName();
+      timesArray.push(timestamp);
+    }else{
+      //first run
+      var oldenTimes = new Date();
+      oldenTimes.setDate(oldenTimes.getDate() - (1000+i));
+      times[oldenTimes] = sheet.getName();
+      timesArray.push(oldenTimes);
+    }
+    
+    i++;
+    
+  }
+  
+  //loop through sheets, starting with the earliest time
+  timesArray = timesArray.sort(function(a, b){return a-b});
+  
+  for(var time in timesArray){
+    var sheetName = times[timesArray[time]];
+    Logger.log("Checking sheet: " + sheetName);
+    var sheet = ss.getSheetByName(sheetName);
+    var campaignName = sheet.getRange(1, 2).getValue();
+    var adGroups = [];
+    var adGroupMins = [];
+    var adGroupColumnNumbers = [];
+    var col = 2;
+    
+    //grab adGroup data from sheet,store in arrays
+    while(sheet.getRange(2, col).getValue()){
+      adGroups.push(sheet.getRange(3, col).getValue());
+      adGroupColumnNumbers.push(col);
+      adGroupMins.push(sheet.getRange(2, col).getValue());
+      col++;
+    }
+    
+    //loop through the adGroups listed in the sheet
+    for(var ag in adGroups){
+      
+      var adGroupName = adGroups[ag];
+      Logger.log("Checking AdGroup: "+ adGroupName);
+      var row = 4;
+      var keywords = [];
+      //get the "positive" keywords from the sheet, for this adGroup
+      while(sheet.getRange(row, adGroupColumnNumbers[ag]).getValue()){
+        keywords.push(sheet.getRange(row, adGroupColumnNumbers[ag]).getValue());
+        row++;
+      }
+      
+      Logger.log("'Positive Keywords' from sheet: "+ keywords);
+      //get the search queries from the campaign, we'll check against these
+      var report = AdWordsApp.report(
+        "SELECT Query " +
+        " FROM SEARCH_QUERY_PERFORMANCE_REPORT " 
+        + " WHERE CampaignName = '"+campaignName  + "'"
+        +  " AND Clicks > " + queryClickMinimum
+        //+  " AND AdGroupName = '" + adGroupName + "'"
+        //+ " DURING LAST_30_DAYS"
+      );
+      
+      var rows = report.rows();
+      var negs = [];  
+      //loop through this campaign's queries, add anything which doesn't contain our positive keywords to the negs array (these will be added as negatives later)
+      while(rows.hasNext()){
+        var nxt = rows.next();
+        var q = nxt.Query;
+        var matches = 0;
+        var count = 0; 
+        
+        //loop through the positive keywords (from the sheet)
+        for(var k in keywords){
+          //if > min (e.g. 2) of the keywords are in the search term, then neg it
+          // Logger.log("Checking against keyword: " + keywords[k]);
+          // Logger.log("Checking against term:    " + q);
+          count++;
+          //if the keyword is in the query, we have a match. match++
+          if(q.indexOf(keywords[k]) > -1){
+            //Logger.log(nxt.Query + " - " + q.indexOf(keywords[k]) + " - " + keywords[k] );
+            matches++;
+          }
+          // Logger.log("matches: " + matches);
+          // Logger.log("count: " + count + " - " + keywords.length);
+          
+          //if we have reached the end of the positive keywords i.e. checked them all
+          //and if the number of matches is less than the minimum number of matches for the adgroup (specified on the sheet)
+          //then add the query to the negatives array
+          if(matches < adGroupMins[ag] && count == keywords.length){
+            // Logger.log(count + " - " + keywords.length);
+            //Logger.log("adding negative: " + nxt.Query);
+            negs.push(q);
+            break;
+          }
+          
+        }    
+        
+      }
+      //we have the negs. Now add them to the adgroup...
+      var adGroupIterator = AdWordsApp.shoppingAdGroups() .withCondition("Name = '"+adGroupName+"'").get();
+      
+      if(adGroupIterator.hasNext()){
+        var adGroup = adGroupIterator.next();
+        var name = adGroup.getName();
+        for(var neg in negs){
+          adGroup.createNegativeKeyword("[" + negs[neg] + "]");
+          
+        }   
+        
+      }else{
+        Logger.log("AdGroup " + adGroupName + " not found in the account. Check the AdGroup name is correct in the sheet.");
+      }
+      
+    }//end ad group loop
+    
+    //timestamp
+    var date = new Date();
+    sheet.getRange(1, 3).setValue(date);
+    
+  }//end time array loop
+  
+  
+}//end main
