@@ -3,7 +3,7 @@
 *
 * Go to automatingadwords.com for installation instructions and advice
 *
-* Version: 1.2
+* Version: 1.3
 **/
   
 //your spreadsheet URL
@@ -40,13 +40,16 @@ var sheet = ss.getSheetByName(SHEET_NAME);
   var keywordGroups = [];
   var adGroupsToAdd = [];
 
+
+
 function main() {
+
   if(createGroups == true){
     Logger.log(createGroups)
     createAdGroups();}
   if(createAds_bool == true){
     createAds();}
-     createKeywords(createKeywords_bool);
+     createKeywords();
      if(pauseExistingKeywords_bool == true){
     pauseExistingKeywords();}
 }
@@ -97,16 +100,16 @@ function createAds(){
     var path2 = sheet.getRange(row, displayUrl2Column).getValue();
     var description = sheet.getRange(row, descriptionColumn).getValue();
     var fullAd = url+headline1+headline2+path1+path2+description;
-
-    Logger.log("campaign name: " + campaignName);
-  var adGroupIterator = AdWordsApp.adGroups()
-       .withCondition('Name = "'+adGroupName+'"')
-       .withCondition('CampaignName = "'+campaignName+'"').get();
-  
-  if (adGroupIterator.hasNext()) {
-    var adGroup = adGroupIterator.next();
     
-    var currentAds = [];
+    Logger.log("campaign name: " + campaignName);
+    var adGroupIterator = AdWordsApp.adGroups()
+    .withCondition('Name = "'+adGroupName+'"')
+    .withCondition('CampaignName = "'+campaignName+'"').get();
+    
+    if (adGroupIterator.hasNext()) {
+      var adGroup = adGroupIterator.next();
+      
+      var currentAds = [];
     var ads = adGroup.ads().withCondition("Status = ENABLED").withCondition("Type = EXPANDED_TEXT_AD").get();
     while(ads.hasNext()){
      var ad = ads.next();
@@ -136,8 +139,9 @@ function createAds(){
   
 }
 
-function createKeywords(status){
-  if(status == true){
+function createKeywords(){
+var ranLabelCheck = false;
+  if(createKeywords_bool == true){
     Logger.log("Creating keywords...");}
     var row = firstAdGroupRow;
     var currentKeywords = [];
@@ -155,11 +159,14 @@ function createKeywords(status){
     
   if (adGroupIterator.hasNext()) {
     var adGroup = adGroupIterator.next();
-    
     //add negs
     var negSplit = sheet.getRange(row, negativeKeywordColumn).getValue().split(",");
-    for(var neg_i in negSplit){
-      adGroup.createNegativeKeyword(negSplit[neg_i])
+    if(createKeywords_bool && negSplit!=""){
+      for(var neg_i in negSplit){
+        if(negSplit[neg_i]!=""){
+          adGroup.createNegativeKeyword(negSplit[neg_i])
+        }
+      }
     }
     currentKeywords = [];
     var currentKeywordsGet = adGroup.keywords().withCondition("Status = ENABLED").get();
@@ -167,49 +174,74 @@ function createKeywords(status){
      currentKeywords.push(currentKeywordsGet.next().getText()); 
     }
     function addKeyword(keyword, url, bid){
-      if(status==true){
-    adGroup.newKeywordBuilder()
+      
+      //create the label if it doesn't exist //only run once
+      //LEFT OFF HERE: Add label if does not exist
+      var labelName = "Builder Keyword";
+      if(!ranLabelCheck && labelName != ""){
+        Logger.log("Label check..");
+        var labels = AdWordsApp.labels().get();
+        while(labels.hasNext()){
+          var label = labels.next();
+          var iter = 0;
+          if(label.getName() != labelName){
+            iter++;
+          }
+          ranLabelCheck = true;
+        }
+        if(labels.totalNumEntities() != iter){
+         AdWordsApp.createLabel(labelName); 
+        }
+      }
+      
+     
+  
+      if(createKeywords_bool==true){
+        Logger.log("adding keyword " + keyword.toLowerCase())        
+        if(url!=""){
+         adGroup.newKeywordBuilder()
         .withText(keyword.toLowerCase())
         .withCpc(bid)                         
         .withFinalUrl(url)
-        .build();
+        .build().getResult().applyLabel("Builder Keyword");
+        }else{
+         adGroup.newKeywordBuilder()
+        .withText(keyword.toLowerCase())
+        .withCpc(bid)                         
+        .build()
+         .getResult().applyLabel(labelName);
+
+        }
     }
       keywordsToAdd.push(keyword.toLowerCase());
     }
-    
     Logger.log("currentKeywords: " +currentKeywords);
-    
     for(var keyword in keywords){
       if(addUrlsToKeywords == false){
         url = "";
-      }else{
+      }        
         function myTrim(x) {
           return x.replace(/^\s+|\s+$/gm,'');
         }
         var kwToAdd = myTrim(keywords[keyword]);
-     
         if(exactBid != 0 && exactBid != "" && exactBid > 0){
           //check if the keyword already exists in the adGroup, add it if not
           var exactKW = '['+kwToAdd+']';
-  
           if(currentKeywords.indexOf(exactKW)>-1){
            Logger.log("The keyword "+exactKW+" already exists in the Ad Group so will not be added or modified");
           }else{
            addKeyword(exactKW, url, exactBid);
           }
-        }
-        
+        }        
         if(phraseBid != 0 && phraseBid != "" && phraseBid > 0){
           var phraseKW = '"'+kwToAdd+'"';
             //check if the keyword already exists in the adGroup, add it if not
-
           if(currentKeywords.indexOf(phraseKW)>-1){
            Logger.log("The keyword "+phraseKW+" already exists in the Ad Group so will not be added or modified");
           }else{
            addKeyword(phraseKW, url, phraseBid);
           }
         }
-        
         if(broadBid != 0 && broadBid != "" && broadBid > 0){
         var broadSplit = kwToAdd.split(" ");
           var kw = "";
@@ -222,7 +254,6 @@ function createKeywords(status){
             }
           }
           //check if the keyword already exists in the adGroup, add it if not
-      
           if(currentKeywords.indexOf(kw)>-1){
            Logger.log("The keyword "+kw+" already exists in the Ad Group so will not be added or modified");
           }else{
@@ -230,7 +261,7 @@ function createKeywords(status){
           }
         }
         
-      }
+      
        
     }
 
@@ -281,3 +312,4 @@ function createAdGroups(){
      
   }  
 }
+
