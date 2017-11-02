@@ -1,4 +1,13 @@
-var ssLink = "your-sheet-url"
+/**
+* AutomatingAdWords.com - Auto-negative keyword adder
+*
+* This script will automatically add negative keywords based on specified criteria
+* Go to automatingadwords.com for installation instructions & advice
+*
+* Version: 1.2
+**/
+
+var ssLink = "your-sheet-url"; //template here: https://docs.google.com/spreadsheets/d/1UKeGsk9hopxePETrEtyC2_GIPK4msTr1lvhYcWoeyB4/edit#gid=0
 var ss = SpreadsheetApp.openByUrl(ssLink);
 var queryClickMinimum = 1; //before being added as a negative, queries must have had a minimum of [queryClickMinimum] clicks i.e. where clicks > [queryClickMinimum]
 
