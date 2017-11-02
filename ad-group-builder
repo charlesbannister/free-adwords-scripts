@@ -7,10 +7,9 @@
 **/
   
 //your spreadsheet URL
-var SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/19Ui-DaYHkrNbM4X-s4R17vVcJXVv5NnTyHsNv35RC_s/edit#gid=0";
+var SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1oQ7pCFk8fAMLwv7JOgK-kmS9aNfR5Jfyn1tYLYwZ_Ms/edit#gid=0";
 //your sheet (tab) name
 var SHEET_NAME = "Builder";
-
 
 //Cell Locations - Only to be changed if the sheet changes
 var firstAdGroupRow = 9; //row of the first AdGroup, 9 is default
@@ -28,41 +27,66 @@ var ss = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
 var sheet = ss.getSheetByName(SHEET_NAME);
 
 //OPTIONS - update on sheet
-  var campaignName = sheet.getRange(2, 2).getValue();
-  var createGroups = sheet.getRange(3, 2).getValue();
-  var createAds_bool = sheet.getRange(4, 2).getValue();
-  var createKeywords_bool = sheet.getRange(5, 2).getValue();
-  var exactBid = sheet.getRange(2,4).getValue();
-  var phraseBid = sheet.getRange(3, 4).getValue();
-  var broadBid = sheet.getRange(4, 4).getValue();
-  var addUrlsToKeywords = sheet.getRange(5, 4).getValue();
-  var pauseExistingKeywords_bool = sheet.getRange(6, 2).getValue();
-  var keywordGroups = [];
-  var adGroupsToAdd = [];
+var campaignName = sheet.getRange(2, 2).getValue();
+var createGroups = sheet.getRange(3, 2).getValue();
+var createAds_bool = sheet.getRange(4, 2).getValue();
+var createKeywords_bool = sheet.getRange(5, 2).getValue();
+var exactBid = sheet.getRange(2,4).getValue();
+var phraseBid = sheet.getRange(3, 4).getValue();
+var broadBid = sheet.getRange(4, 4).getValue();
+var addUrlsToKeywords = sheet.getRange(5, 4).getValue();
+var pauseExistingKeywords_bool = sheet.getRange(6, 2).getValue();
+var adGroupLabel = sheet.getRange(2, 6).getValue();
+var adLabel = sheet.getRange(3, 6).getValue();
+var keywordLabel = sheet.getRange(4, 6).getValue();
+var keywordGroups = [];
+var adGroupsToAdd = [];
 
 
 
 function main() {
-
+  
+  //create the labels if they don't exist
+  createLabel(adGroupLabel)
+  createLabel(adLabel)
+  createLabel(keywordLabel)
+  
   if(createGroups == true){
-    Logger.log(createGroups)
+    // Logger.log(createGroups)
     createAdGroups();}
   if(createAds_bool == true){
     createAds();}
-     createKeywords();
-     if(pauseExistingKeywords_bool == true){
+  createKeywords();
+  if(pauseExistingKeywords_bool == true){
     pauseExistingKeywords();}
+  Logger.log("All done!")
+}
+
+function createLabel(labelName){
+  if(labelName==""){return}
+  
+        var labels = AdWordsApp.labels().get();
+        while(labels.hasNext()){
+          var label = labels.next();
+          var iter = 0;
+          if(label.getName() == labelName){
+            iter++;
+          }
+        }
+        if(iter==0){
+         AdWordsApp.createLabel(labelName); 
+        }
 }
 
 function pauseExistingKeywords(){
   Logger.log("Pausing existing keywords...");
-  Logger.log("keyword groups: " + keywordGroups);
+  //Logger.log("keyword groups: " + keywordGroups);
   
   for(var kwGroup_i in keywordGroups){
     var keywordsToAdd = keywordGroups[kwGroup_i];
   
-  Logger.log("keywords to pause: " + keywordsToAdd);
-  Logger.log("excluding this adgroup: " + adGroupsToAdd[kwGroup_i]);
+  //Logger.log("keywords to pause: " + keywordsToAdd);
+  //Logger.log("excluding this adgroup: " + adGroupsToAdd[kwGroup_i]);
   
   var keywords = AdWordsApp.keywords()
   .withCondition("Status = ENABLED")
@@ -76,10 +100,10 @@ function pauseExistingKeywords(){
     Logger.log(keyword.getText());
     }
     if(keywordsToAdd.indexOf(keyword.getText())>-1){
-      Logger.log("Keyword to pause (after adGroup check): " + keyword.getText());
-      Logger.log(keyword.getAdGroup().getName());      
+      //Logger.log("Keyword to pause (after adGroup check): " + keyword.getText());
+      //Logger.log(keyword.getAdGroup().getName());      
       if(adGroupsToAdd[kwGroup_i].indexOf(keyword.getAdGroup().getName())==-1){
-      Logger.log("Keyword to pause, adgroup check done: " + keyword.getText());
+      //Logger.log("Keyword to pause, adgroup check done: " + keyword.getText());
       keyword.pause();
       }
     }
@@ -101,7 +125,7 @@ function createAds(){
     var description = sheet.getRange(row, descriptionColumn).getValue();
     var fullAd = url+headline1+headline2+path1+path2+description;
     
-    Logger.log("campaign name: " + campaignName);
+   // Logger.log("campaign name: " + campaignName);
     var adGroupIterator = AdWordsApp.adGroups()
     .withCondition('Name = "'+adGroupName+'"')
     .withCondition('CampaignName = "'+campaignName+'"').get();
@@ -116,12 +140,12 @@ function createAds(){
 
       var fullCurrentAd = ad.urls().getFinalUrl() + ad.getHeadlinePart1() + ad.getHeadlinePart2() + ad.getPath1() + ad.getPath2() +ad.getDescription();
       currentAds.push(fullCurrentAd);
-     Logger.log(fullCurrentAd);
+     //Logger.log(fullCurrentAd);
 
     }
     
     if(currentAds.indexOf(fullAd)>-1){
-      Logger.log("The ad already exists in the Ad Group so will not be created again");      
+      //Logger.log("The ad already exists in the Ad Group so will not be created again");      
     }else{
     
     adGroup.newAd().expandedTextAdBuilder()
@@ -131,7 +155,7 @@ function createAds(){
         .withPath1(path1)
         .withPath2(path2)
         .withFinalUrl(url)
-        .build();
+        .build().getResult().applyLabel(adLabel);
   }
   }
     row++;
@@ -175,47 +199,27 @@ var ranLabelCheck = false;
     }
     function addKeyword(keyword, url, bid){
       
-      //create the label if it doesn't exist //only run once
-      //LEFT OFF HERE: Add label if does not exist
-      var labelName = "Builder Keyword";
-      if(!ranLabelCheck && labelName != ""){
-        Logger.log("Label check..");
-        var labels = AdWordsApp.labels().get();
-        while(labels.hasNext()){
-          var label = labels.next();
-          var iter = 0;
-          if(label.getName() != labelName){
-            iter++;
-          }
-          ranLabelCheck = true;
-        }
-        if(labels.totalNumEntities() != iter){
-         AdWordsApp.createLabel(labelName); 
-        }
-      }
       
-     
-  
       if(createKeywords_bool==true){
-        Logger.log("adding keyword " + keyword.toLowerCase())        
+        //Logger.log("adding keyword " + keyword.toLowerCase())        
         if(url!=""){
          adGroup.newKeywordBuilder()
         .withText(keyword.toLowerCase())
         .withCpc(bid)                         
         .withFinalUrl(url)
-        .build().getResult().applyLabel("Builder Keyword");
+        .build().getResult().applyLabel(keywordLabel);
         }else{
          adGroup.newKeywordBuilder()
         .withText(keyword.toLowerCase())
         .withCpc(bid)                         
         .build()
-         .getResult().applyLabel(labelName);
+         .getResult().applyLabel(keywordLabel);
 
         }
     }
       keywordsToAdd.push(keyword.toLowerCase());
     }
-    Logger.log("currentKeywords: " +currentKeywords);
+    //Logger.log("currentKeywords: " +currentKeywords);
     for(var keyword in keywords){
       if(addUrlsToKeywords == false){
         url = "";
@@ -277,7 +281,7 @@ function createAdGroups(){
  Logger.log("Creating adgroups...");
   
   var defaultBid = sheet.getRange(2, 4).getValue();
-  Logger.log("Campaign name: " + campaignName);
+ // Logger.log("Campaign name: " + campaignName);
   var row = firstAdGroupRow;
   while(sheet.getRange(row, adGroupColumn).getValue()){
     var adGroupName = sheet.getRange(row, adGroupColumn).getValue();
@@ -305,6 +309,9 @@ function createAdGroups(){
  .withCpc(agMaxCPC)
     .build();
  var adGroup = adGroupOperation.getResult();
+   if(adGroupOperation.isSuccessful()){
+   adGroup.applyLabel(adGroupLabel)
+   }
 
  }
     
@@ -312,4 +319,3 @@ function createAdGroups(){
      
   }  
 }
-
