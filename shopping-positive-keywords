@@ -4,7 +4,7 @@
 * This script will automatically add negative keywords based on specified criteria
 * Go to automatingadwords.com for installation instructions & advice
 *
-* Version: 1.2
+* Version: 1.3
 **/
 
 var ssLink = "your-sheet-url"; //template here: https://docs.google.com/spreadsheets/d/1UKeGsk9hopxePETrEtyC2_GIPK4msTr1lvhYcWoeyB4/edit#gid=0
@@ -119,6 +119,8 @@ function main() {
         }    
         
       }
+      Logger.log("Found a total of "+negs.length+" negative keywords to add")
+      Logger.log("Adding the negative keywords...")
       //we have the negs. Now add them to the adgroup...
       var adGroupIterator = AdWordsApp.shoppingAdGroups() .withCondition("Name = '"+adGroupName+"'").get();
       
@@ -141,6 +143,6 @@ function main() {
     sheet.getRange(1, 3).setValue(date);
     
   }//end time array loop
-  
+  Logger.log("Finished")
   
 }//end main
