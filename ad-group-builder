@@ -66,9 +66,9 @@ function createLabel(labelName){
   if(labelName==""){return}
   
         var labels = AdWordsApp.labels().get();
+        var iter = 0;
         while(labels.hasNext()){
           var label = labels.next();
-          var iter = 0;
           if(label.getName() == labelName){
             iter++;
           }
