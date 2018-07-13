@@ -4,7 +4,7 @@
 * This script will automatically add negative keywords based on specified criteria
 * Go to automatingadwords.com for installation instructions & advice
 *
-* Version: 1.4
+* Version: 1.5
 **/
 
 var ssLink = "your-sheet-url"; //template here: https://docs.google.com/spreadsheets/d/1UKeGsk9hopxePETrEtyC2_GIPK4msTr1lvhYcWoeyB4/edit#gid=0
@@ -122,24 +122,36 @@ function main() {
       Logger.log("Found a total of "+negs.length+" negative keywords to add")
       Logger.log("Adding the negative keywords...")
       //we have the negs. Now add them to the adgroup...
-      var adGroupIterator = AdWordsApp.shoppingAdGroups()
-      .withCondition("Name = '"+adGroupName+"'")
-      .withCondition("CampaignName = '"+campaignName+"'")
-      .get();
-      
-      if(adGroupIterator.hasNext()){
-        var adGroup = adGroupIterator.next();
-        var name = adGroup.getName();
-        for(var neg in negs){
-          adGroup.createNegativeKeyword("[" + negs[neg] + "]");
-          
-        }   
-        
-      }else{
-        Logger.log("AdGroup " + adGroupName + " not found in the account. Check the AdGroup name is correct in the sheet.");
-      }
-      
-    }//end ad group loop
+      var iterTypes = ["Shopping", "Text"]
+      for(var t in iterTypes){
+      var type = iterTypes[t]
+      if(type=="Shopping"){
+        var adGroupIterator = AdWordsApp.shoppingAdGroups()
+        .withCondition("Name = '"+adGroupName+"'")
+        .withCondition("CampaignName = '"+campaignName+"'")
+        .get();
+        }else{
+           var adGroupIterator = AdWordsApp.adGroups()
+        .withCondition("Name = '"+adGroupName+"'")
+        .withCondition("CampaignName = '"+campaignName+"'")
+        .get();
+        }
+
+        if(adGroupIterator.hasNext()){
+          var adGroup = adGroupIterator.next();
+          var name = adGroup.getName();
+          for(var neg in negs){
+            adGroup.createNegativeKeyword("[" + negs[neg] + "]");
+
+          }   
+
+        }else{
+          Logger.log("AdGroup " + adGroupName + " not found in the account. Check the AdGroup name is correct in the sheet.");
+        }
+
+      }//end ad group loop
+    
+    }
     
     //timestamp
     var date = new Date();
