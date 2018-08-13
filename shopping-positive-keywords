@@ -4,12 +4,18 @@
 * This script will automatically add negative keywords based on specified criteria
 * Go to automatingadwords.com for installation instructions & advice
 *
-* Version: 1.5
+* Version: 1.6
 **/
 
 var ssLink = "your-sheet-url"; //template here: https://docs.google.com/spreadsheets/d/1UKeGsk9hopxePETrEtyC2_GIPK4msTr1lvhYcWoeyB4/edit#gid=0
 var ss = SpreadsheetApp.openByUrl(ssLink);
 var queryClickMinimum = 1; //before being added as a negative, queries must have had a minimum of [queryClickMinimum] clicks i.e. where clicks > [queryClickMinimum]
+
+//Choose between "BMM", "Broad", "Exact" and "Phrase"
+var matchType = "Exact"
+
+//You may also be interested in this Chrome keyword wrapper!
+//https://chrome.google.com/webstore/detail/keyword-wrapper/paaonoglkfolneaaopehamdadalgehbb
 
 function main() {
 
@@ -141,8 +147,8 @@ function main() {
           var adGroup = adGroupIterator.next();
           var name = adGroup.getName();
           for(var neg in negs){
-            adGroup.createNegativeKeyword("[" + negs[neg] + "]");
-
+          var neg = addMatchType(negs[neg])
+            adGroup.createNegativeKeyword(neg);
           }   
 
         }else{
@@ -161,3 +167,20 @@ function main() {
   Logger.log("Finished")
   
 }//end main
+
+function addMatchType(word){
+if(matchType.toLowerCase()=="broad"){
+ word = word.trim();
+}else if(matchType.toLowerCase()=="bmm"){
+word = word.split(" ").map(function (x){return "+"+x}).join(" ").trim()
+}else if(matchType.toLowerCase()=="phrase"){
+word = '"' + word.trim() +  '"'
+}else if(matchType.toLowerCase()=="exact"){
+word = '[' + word.trim() +  ']'
+}else{
+throw("Error: Match type not recognised. Please provide one of Broad, BMM, Exact or Phrase")
+}
+return word;
+}
+
+function log(x){Logger.log(x)}
