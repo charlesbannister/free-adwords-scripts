@@ -85,7 +85,7 @@ function main() {
         " FROM SEARCH_QUERY_PERFORMANCE_REPORT " 
         + " WHERE CampaignName = '"+campaignName  + "'"
         +  " AND Clicks > " + queryClickMinimum
-        //+  " AND AdGroupName = '" + adGroupName + "'"
+        +  " AND AdGroupName = '" + adGroupName + "'"
         //+ " DURING LAST_30_DAYS"
       );
       
