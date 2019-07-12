@@ -203,8 +203,31 @@ function main() {
   log("Finished.")
 }//end main
 
-function containsKeyword(queryString, keyword) {
-  return queryString.indexOf(keyword) > -1;
+/**
+ * Checks if a keyword matches a query string. Not just as a substring,
+ * but the whole keyword must match (a) whole word(s) in the query. (Keyword
+ * can also be multiple words, which then must be contained in the string in
+ * the same order.)
+ */
+function containsKeyword(string, keyword) {
+  // If the string is equal to the keyword, it 'contains' the keyword.
+  var match = string === keyword;
+  if (!match) {
+    // Otherwise, for speed, first search if the keyword is a substring. If so,
+    // then go on to determine if the string actually contains this keyword.
+    var index = string.indexOf(keyword);
+    match = index >= 0;
+    if (match) {
+      // Check: a keyword which is a substring should not trigger a match. For
+      // simplicity, we assume the only non-word characters in the query string
+      // (for our purpose) are spaces. So check for spaces or string start/end
+      // on both sides.
+      var positionAfterMatch = index + keyword.length;
+      match = ((index === 0 || string[index - 1] === ' ')
+        && (positionAfterMatch === string.length || string[positionAfterMatch] === ' '));
+    }
+  }
+  return match;
 }
 
 function addMatchType(word, SETTINGS) {
