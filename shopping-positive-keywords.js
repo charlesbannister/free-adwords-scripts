@@ -83,7 +83,7 @@ function main() {
     // for this; we assume this is always populated.
     var currentAdgroupCol = 2;
     while (sheet.getRange(numMatchesRow, currentAdgroupCol).getValue()) {
-      var adGroupMin = sheet.getRange(numMatchesRow, currentAdgroupCol).getValue();
+      var minKeywordMatches = sheet.getRange(numMatchesRow, currentAdgroupCol).getValue();
       var adGroupName = sheet.getRange(adGroupNameRow, currentAdgroupCol).getValue();
       log("Checking campaign: " + SETTINGS["CAMPAIGN_NAME"] +"; ad group: " + adGroupName);
 
@@ -115,7 +115,7 @@ function main() {
 
         // Get the 'positive' keywords from the sheet for this campaign / ad
         // group. NOTE: if the row contains duplicate keywords, these will
-        // count as two matches, which is important if adGroupMin > 1!
+        // count as two matches, which is important if minKeywordMatches > 1!
         var keywords = [];
         var row = firstAdGroupRow;
         while (sheet.getRange(row, currentAdgroupCol).getValue()) {
@@ -153,42 +153,42 @@ function main() {
         // through all types, with the same outcome - but that may change.
         while (rows.hasNext()) {
           var nxt = rows.next();
-          var q = nxt.Query;
+          var queryString = nxt.Query;
           var matches = 0;
-          var count = 0;
 
-          //loop through the positive keywords (from the sheet)
+          // Loop through the positive keywords (from the sheet); if we find
+          // enough matches then stop processing.
           for (var k in keywords) {
-            //if > min (e.g. 2) of the keywords are in the search term, then neg it
-            // log("Checking against keyword: " + keywords[k]);
-            // log("Checking against term:    " + q);
-            count++;
-            //if the keyword is in the query, we have a match. match++
-            if (q.indexOf(keywords[k]) > -1) {
-              //log(nxt.Query + " - " + q.indexOf(keywords[k]) + " - " + keywords[k] );
+            if (containsKeyword(queryString, keywords[k])) {
               matches++;
-            }
-            // log("matches: " + matches);
-            // log("count: " + count + " - " + keywords.length);
-
-            //if we have reached the end of the positive keywords i.e. checked them all
-            //and if the number of matches is leSS than the minimum number of matches for the adgroup (specified on the sheet)
-            //then add the query to the negatives array
-            if (matches < adGroupMin && count == keywords.length) {
-              // log(count + " - " + keywords.length);
-              //log("adding negative: " + nxt.Query);
-              negs.push(q);
-              break;
+              // Log 'trace' so that if we select DEBUG as threshold, we only
+              // get a list of 'to be added' keywords.
+              if (matches >= minKeywordMatches) {
+                log("Query '" + queryString + "' contains positive keyword '" + keywords[k] + "'; skipping.", LOGLEVEL_TRACE);
+                break;
+              }
+              log("Query '" + queryString + "' contains positive keyword '" + keywords[k] + "', but continuing (" + matches + " < " + minKeywordMatches + " matches).", LOGLEVEL_TRACE);
             }
           }
+
+          // Add as a negative keyword if we did not find enough matches.
+          if (matches < minKeywordMatches) {
+            // Use 'debug' level because every script will try to re-add the
+            // same keywords, so it's not extremely useful.
+            log("Query '" + queryString + "' will be added as negative keyword.", LOGLEVEL_DEBUG);
+            negs.push(queryString);
+          }
         }
-        log("Found a total of " + negs.length + " negative keywords to add.");
 
         // Now add the new negative keywords to the ad group.
-        log("Adding the negative keywords...");
-        for (var neg in negs) {
-          neg = addMatchType(negs[neg], SETTINGS);
-          adGroup.createNegativeKeyword(neg);
+        if (negs.length) {
+          log("Adding a total of " + negs.length + " negative keywords...");
+          for (var neg in negs) {
+            neg = addMatchType(negs[neg], SETTINGS);
+            adGroup.createNegativeKeyword(neg);
+          }
+        } else {
+          log("Found no new negative keywords to add.");
         }
       }//end ad types loop
 
@@ -202,6 +202,10 @@ function main() {
 
   log("Finished.")
 }//end main
+
+function containsKeyword(queryString, keyword) {
+  return queryString.indexOf(keyword) > -1;
+}
 
 function addMatchType(word, SETTINGS) {
   if (SETTINGS["NEGATIVE_MATCH_TYPE"].toLowerCase() == "broad") {
