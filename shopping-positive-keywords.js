@@ -4,7 +4,10 @@
 * This script will automatically add negative keywords based on specified criteria
 * Go to automatingadwords.com for installation instructions & advice
 *
-* Version: 1.7.1
+* Version: 1.8
+*
+*Updates:
+ - 1.8 - converted positive keywords to lowercase making then case-insensitive
 *
 **/
 
@@ -95,7 +98,7 @@ function main() {
       var keywords = [];
       //get the "positive" keywords from the sheet, for this adGroup
       while(sheet.getRange(row, adGroupColumnNumbers[ag]).getValue()){
-        keywords.push(sheet.getRange(row, adGroupColumnNumbers[ag]).getValue());
+        keywords.push(sheet.getRange(row, adGroupColumnNumbers[ag]).getValue().toLowerCase());
         row++;
       }
       
