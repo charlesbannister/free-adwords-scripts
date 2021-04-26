@@ -98,7 +98,7 @@ function main() {
       var keywords = [];
       //get the "positive" keywords from the sheet, for this adGroup
       while(sheet.getRange(row, adGroupColumnNumbers[ag]).getValue()){
-        keywords.push(sheet.getRange(row, adGroupColumnNumbers[ag]).getValue().toLowerCase());
+        keywords.push(sheet.getRange(row, String(adGroupColumnNumbers[ag]).getValue()).toLowerCase());
         row++;
       }
       
