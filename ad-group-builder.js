@@ -3,7 +3,8 @@
   *
   * Go to automatingadwords.com for installation instructions and advice
   *
-  * Version: 1.5.0
+  * V 1.6.0 - Added H3 and D2 support (the settings sheet needs updating)
+  * Version: 1.6.0
   **/
     
   //your spreadsheet URL
@@ -22,9 +23,11 @@
   var negativeKeywordColumn = ss.getRangeByName("negativeKeywords").getColumn()
   var headline1Column = ss.getRangeByName("headline1").getColumn()
   var headline2Column = ss.getRangeByName("headline2").getColumn()
+  var headline3Column = ss.getRangeByName("headline3").getColumn()
   var displayUrl1Column = ss.getRangeByName("path1").getColumn()
   var displayUrl2Column = ss.getRangeByName("path2").getColumn()
   var descriptionColumn = ss.getRangeByName("description").getColumn()
+  var description2Column = ss.getRangeByName("description2").getColumn()
 
   //OPTIONS - update on sheet
   var campaignName = myTrim(sheet.getRange(2, 2).getValue());
@@ -180,10 +183,12 @@
       var url = sheet.getRange(row, urlColumn).getValue();  
       var headline1 = sheet.getRange(row, headline1Column).getValue();
       var headline2 = sheet.getRange(row, headline2Column).getValue();
+      var headline3 = sheet.getRange(row, headline3Column).getValue();
       var path1 = sheet.getRange(row, displayUrl1Column).getValue();
       var path2 = sheet.getRange(row, displayUrl2Column).getValue();
       var description = sheet.getRange(row, descriptionColumn).getValue();
-      var fullAd = url+headline1+headline2+path1+path2+description;
+      var description2 = sheet.getRange(row, description2Column).getValue();
+      var fullAd = url+headline1+headline2+headline3+path1+path2+description+description2;
       
     // msg("campaign name: " + campaignName);
       var adGroupIterator = AdWordsApp.adGroups()
@@ -198,7 +203,7 @@
       while(ads.hasNext()){
       var ad = ads.next();
 
-        var fullCurrentAd = ad.urls().getFinalUrl() + ad.getHeadlinePart1() + ad.getHeadlinePart2() + ad.getPath1() + ad.getPath2() +ad.getDescription();
+        var fullCurrentAd = ad.urls().getFinalUrl() + ad.getHeadlinePart1() + ad.getHeadlinePart2() + ad.getHeadlinePart3() + ad.getPath1() + ad.getPath2() +ad.getDescription()+ad.getDescription2();
         currentAds.push(fullCurrentAd);
 
       }
@@ -210,7 +215,9 @@
       var build = adGroup.newAd().expandedTextAdBuilder()
           .withHeadlinePart1(headline1)
           .withHeadlinePart2(headline2)
-          .withDescription(description)
+          .withHeadlinePart3(headline3)
+          .withDescription1(description)
+          .withDescription2(description2)
           .withPath1(path1)
           .withPath2(path2)
           .withFinalUrl(url)
