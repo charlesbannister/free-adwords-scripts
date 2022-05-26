@@ -4,14 +4,12 @@
 * This script will automatically add negative keywords based on specified criteria
 * Go to automatingadwords.com for installation instructions & advice
 *
-* Version: 1.8
+* Version: 1.9
 *
-*Updates:
- - 1.8 - converted positive keywords to lowercase making then case-insensitive
 *
 **/
 
-var SPREADSHEET_URL = "your-ss-url-here"; //template here: https://docs.google.com/spreadsheets/d/1G8mjtESGW3O1Jtd3l9MvqPA93cwUvFdVwkWsHOvT0W4/edit#gid=0
+var SPREADSHEET_URL = "your-spreadsheet-url-here"; //template here: https://docs.google.com/spreadsheets/d/1G8mjtESGW3O1Jtd3l9MvqPA93cwUvFdVwkWsHOvT0W4/edit#gid=0
 var SS = SpreadsheetApp.openByUrl(SPREADSHEET_URL);
 
 //You may also be interested in this Chrome keyword wrapper!
@@ -69,20 +67,17 @@ function main() {
     Logger.log("Settings: "+ JSON.stringify(SETTINGS))
 
     var adGroups = [];
-    var negativeLists = [];
     var adGroupMins = [];
     var adGroupColumnNumbers = [];
     var col = 2;
 
     var numMatchesRow = 4
     var adGroupNameRow = 5
-    var keywordListNameRow = 6
-    var firstAdGroupRow = 7
+    var firstAdGroupRow = 6
     
     //grab adGroup data from sheet,store in arrays
     while(sheet.getRange(numMatchesRow, col).getValue()){
       adGroups.push(sheet.getRange(adGroupNameRow, col).getValue());
-      negativeLists.push(sheet.getRange(keywordListNameRow, col).getValue());
       adGroupColumnNumbers.push(col);
       adGroupMins.push(sheet.getRange(numMatchesRow, col).getValue());
       col++;
@@ -92,13 +87,12 @@ function main() {
     for(var ag in adGroups){
       
       var adGroupName = adGroups[ag];
-      var negativeList = negativeLists[ag];
       Logger.log("Checking AdGroup: "+ adGroupName);
       var row = firstAdGroupRow;
       var keywords = [];
       //get the "positive" keywords from the sheet, for this adGroup
       while(sheet.getRange(row, adGroupColumnNumbers[ag]).getValue()){
-        keywords.push(sheet.getRange(row, String(adGroupColumnNumbers[ag]).getValue()).toLowerCase());
+        keywords.push(String(sheet.getRange(row, adGroupColumnNumbers[ag]).getValue()).toLowerCase());
         row++;
       }
       
@@ -129,7 +123,7 @@ function main() {
       }
       
       log("query: " + query)
-      var report = AdWordsApp.report(query);
+      var report = AdsApp.report(query);
       
       var rows = report.rows();
       var negs = [];  
@@ -181,11 +175,11 @@ function main() {
 
         if(type=="Shopping"){
 
-          var adGroupIterator = AdWordsApp.shoppingAdGroups()
+          var adGroupIterator = AdsApp.shoppingAdGroups()
 
         }else{
 
-          var adGroupIterator = AdWordsApp.adGroups()
+          var adGroupIterator = AdsApp.adGroups()
 
         }
 
@@ -203,10 +197,6 @@ function main() {
             for(var neg in negs){
 
               var neg = addMatchType(negs[neg],SETTINGS)
-              if(negativeList!==''){
-                addNegativeToList(negativeList, neg)
-                continue
-              }
               adGroup.createNegativeKeyword(neg);
               
             }   
@@ -230,18 +220,6 @@ function main() {
   Logger.log("Finished")
   
 }//end main
-
-function addNegativeToList(negativeListName, neg){
-
-  var listIter = AdWordsApp.negativeKeywordLists().withCondition("Name = '"+ negativeListName +"'").get()
-    if(listIter.hasNext()){
-      var negativeList = listIter.next();
-    }else{
-      log("The shared negative '"+negativeListName+"' list can't be found") 
-    }
-    negativeList.addNegativeKeywords([neg])
-
-}
 
 function addMatchType(word,SETTINGS){
   if(SETTINGS["NEGATIVE_MATCH_TYPE"].toLowerCase()=="broad"){
